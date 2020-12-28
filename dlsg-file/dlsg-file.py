@@ -21,7 +21,6 @@ def main():
     args = get_cmd_line_agurments()
     statement = DLSG()
     statement.read_file(args.file)
-    statement.dump()
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
