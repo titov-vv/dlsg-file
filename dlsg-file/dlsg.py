@@ -1,5 +1,6 @@
 import re
 import logging
+import datetime
 
 # standard header is "DLSG            DeclYYYY0102FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", where YYYY is year of declaration
 HEADER_LENGTH = 60
@@ -105,6 +106,30 @@ class DLSGDeclInquiry:
 class DLSGCurrencyIncome:
     tag = 'CurrencyIncome'
 
+    # Create empty dividend
+    def __init__(self, id):
+        self.id = id
+        self.type = '14'
+        self.income_code = '1010'
+        self.income_description = 'Дивиденды'
+        self.description = ''
+        self.country_code = '840'
+        self.income_date = 0
+        self.tax_payment_date = 0
+        self.auto_currency_rate = '0'   # '0' = no auto currency rates
+        self.currency_code = ''
+        self.income_rate = 0.0
+        self.income_units = 0
+        self.tax_rate = 0.0
+        self.tax_units = 0
+        self.currency_name = ''
+        self.income_currency = 0.0
+        self.income_rub = 0.0
+        self.tax_currency = 0.0
+        self.tax_rub = 0.0
+        self.records = ['0', '0', '0', '0', '', '0']
+
+    # Created dividend based of records from file
     def __init__(self, id, records):
         self.id = id
         self.type = records.pop(0)
@@ -112,24 +137,28 @@ class DLSGCurrencyIncome:
         self.income_description = records.pop(0)
         self.description = records.pop(0)
         self.country_code = records.pop(0)
-        self.income_date = records.pop(0)
-        self.tax_payment_date = records.pop(0)
+        self.income_date = int(records.pop(0))
+        self.tax_payment_date = int(records.pop(0))
         self.auto_currency_rate = records.pop(0)   # '0' = no auto currency rates
         self.currency_code = records.pop(0)
-        self.income_rate = records.pop(0)
-        self.income_units = records.pop(0)
-        self.tax_rate = records.pop(0)
-        self.tax_units = records.pop(0)
+        self.income_rate = float(records.pop(0))
+        self.income_units = int(records.pop(0))
+        self.tax_rate = float(records.pop(0))
+        self.tax_units = int(records.pop(0))
         self.currency_name = records.pop(0)
-        self.income_currency = records.pop(0)
-        self.income_rub = records.pop(0)
-        self.tax_currency = records.pop(0)
-        self.tax_rub = records.pop(0)
+        self.income_currency = float(records.pop(0))
+        self.income_rub = float(records.pop(0))
+        self.tax_currency = float(records.pop(0))
+        self.tax_rub = float(records.pop(0))
         self.records = records[:6]
         [records.pop(0) for _ in range(6)]
 
+
 class DLSGDeclForeign:
     tag = 'DeclForeign'
+    currencies = {
+        "USD": ('840', 'Доллар сша', 100)
+    }
 
     def __init__(self, records):
         self.count = int(records.pop(0))
@@ -142,6 +171,24 @@ class DLSGDeclForeign:
                 logging.fatal(f"Invalid DeclForeign subsection: {section_name}")
                 raise ValueError
             self.sections[i] = DLSGCurrencyIncome(i, records)
+
+    def add_dividend(self, description, timestamp, currency_code, amount, amount_rub, tax, tax_rub, rate):
+        currency = self.currencies[currency_code]
+        dividend = DLSGCurrencyIncome(self.count)
+        dividend.description = description
+        dividend.income_date = (timestamp.date() - datetime.date(1899, 12, 30)).days
+        dividend.tax_payment_date = dividend.income_date
+        dividend.currency_code = currency[0]
+        dividend.currency_name = currency[1]
+        dividend.income_units = dividend.tax_units = currency[2]
+        dividend.income_rate = dividend.tax_rate = rate * currency[2]
+        dividend.income_currency = amount
+        dividend.income_rub = amount_rub
+        dividend.tax_currency = tax
+        dividend.tax_rub = tax_rub
+        self.sections[self.count] = dividend
+        self.count += 1
+
 
 class DLSGUnknownSection:
     def __init__(self, tag, records):
@@ -158,8 +205,20 @@ class DLSG:
         self._sections = {}
         self._footer_len = 0        # if file ends with _footer_len 0x00 bytes
 
-    def dump(self):
-        print(self._records)
+    def add_dividend(self, **kwargs):
+        foreign_section = self.get_section('DeclForeign')
+        if foreign_section is None:
+            logging.fatal(f"Declaration has now 'DeclForeign' section")
+            return
+        foreign_section.add_dividend(kwargs['description'], kwargs['timestamp'], kwargs['currency'],
+                                     kwargs['amount'], kwargs['amount_rub'],kwargs['tax'], kwargs['tax_rub'],
+                                     kwargs['tax_rate'])
+
+    def get_section(self, name):
+        for section in self._sections:
+            if section.tag == name:
+                return section
+        return None
 
     # Method reads declaration form a file with given filename
     # Header of file is being validated
