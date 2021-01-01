@@ -248,7 +248,10 @@ class DLSGCurrencyIncome(DLSGsection):
 class DLSGDeclForeign(DLSGsection):
     tag = 'DeclForeign'
     currencies = {
-        "USD": ('840', 'Доллар США', 100)
+        'USD': ('840', 'Доллар США', 100),
+        'EUR': ('978', 'Евро', 100),
+        'GBP': ('826', 'Фунт стерлингов', 100),
+        'CNY': ('156', 'Юань', 1000),
     }
 
     def __init__(self, records):
@@ -420,7 +423,7 @@ class DLSG:
 
         logging.debug(f"Sections loaded: {i}")
         for j in range(i):
-            logging.debug(f"Section: {self._sections[j].tag} ")
+            logging.debug(f"Section '{self._sections[j].tag}' loaded as " + str(type(self._sections[j])))
 
     def write_file(self, filename):
         logging.info(f"Writing file: {filename}")
