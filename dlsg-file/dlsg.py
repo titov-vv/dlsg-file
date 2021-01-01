@@ -13,16 +13,35 @@ class DLSGrecord:
     def __init__(self):
         self.name = ''
 
-class DLSGDeclInfo:
+class DLSGsection:
+    def __init__(self, tag, records):
+        self.tag = tag
+        self._records = []
+        while (len(records) > 0) and (records[0][:1] != SECTION_PREFIX):
+            self._records.append(records.pop(0))
+
+    def write(self, records):
+        self.write_tag(records)
+        records.extend(self._records)
+
+    def write_tag(self, records):
+        records.append(SECTION_PREFIX + self.tag)
+
+
+class DLSGDeclInfo(DLSGsection):
     tag = 'DeclInfo'
 
     def __init__(self, records):
         self.inspection = records.pop(0)
-        self.records = []
-        while records[0][:1] != SECTION_PREFIX:
-            self.records.append(records.pop(0))
+        super().__init__(self.tag, records)
 
-class DLSGPersonName:
+    def write(self, records):
+        self.write_tag(records)
+        records.append(self.inspection)
+        records.extend(self._records)
+
+
+class DLSGPersonName(DLSGsection):
     tag = 'PersonName'
 
     def __init__(self, records):
@@ -32,25 +51,50 @@ class DLSGPersonName:
         self.inn = records.pop(0)
         self.birth_place = records.pop(0)
         self.birth_date = records.pop(0)
+        super().__init__(self.tag, records)
 
-class DLSGHomePhone:
+    def write(self, records):
+        self.write_tag(records)
+        records.append(self.surname)
+        records.append(self.name)
+        records.append(self.middle_name)
+        records.append(self.inn)
+        records.append(self.birth_place)
+        records.append(self.birth_date)
+
+
+class DLSGHomePhone(DLSGsection):
     tag = 'HomePhone'
 
     def __init__(self, records):
         self.code = records.pop(0)
         self.number = records.pop(0)
+        super().__init__(self.tag, records)
 
-class DLSGWorkPhone:
+    def write(self, records):
+        self.write_tag(records)
+        records.append(self.code)
+        records.append(self.number)
+
+class DLSGWorkPhone(DLSGsection):
     tag = 'WorkPhone'
 
     def __init__(self, records):
         self.code = records.pop(0)
         self.number = records.pop(0)
+        super().__init__(self.tag, records)
 
-class DLSGSourseIncome:
+    def write(self, records):
+        self.write_tag(records)
+        records.append(self.code)
+        records.append(self.number)
+
+
+class DLSGSourseIncome(DLSGsection):
     tag = 'SourseIncome'
 
-    def __init__(self, records):
+    def __init__(self, id, records):
+        self.id = id
         self.income_code = records.pop(0)
         self.income_description = records.pop(0)
         self.amount = records.pop(0)
@@ -58,10 +102,22 @@ class DLSGSourseIncome:
         self.deduction_amount = records.pop(0)
         self.unknown = records.pop(0)
         self.month = records.pop(0)
-        self.records = records[:4]
-        [records.pop(0) for _ in range(4)]
+        # self.records = records[:4]
+        super().__init__(self.tag, records)
+        # [records.pop(0) for _ in range(4)]
 
-class DLSGThirteenPercent:
+    def write(self, records, id):
+        records.append(SECTION_PREFIX + self.tag + f"{id:03d}" + f"{self.id:03d}")
+        records.append(self.income_code)
+        records.append(self.income_description)
+        records.append(self.amount)
+        records.append(self.deduction_code)
+        records.append(self.deduction_amount)
+        records.append(self.unknown)
+        records.append(self.month)
+        records.extend(self._records)
+
+class DLSGThirteenPercent(DLSGsection):
     tag = 'ThirteenPercent'
 
     def __init__(self, id, records):
@@ -71,7 +127,7 @@ class DLSGThirteenPercent:
         self.kpp = records.pop(0)
         self.oktmo = records.pop(0)
         self.name = records.pop(0)
-        self.records = records[:17]
+        self._records = records[:17]
         [records.pop(0) for _ in range(17)]
         self.count = int(records.pop(0))
         self.sections = {}
@@ -82,9 +138,21 @@ class DLSGThirteenPercent:
             if section_name != SECTION_PREFIX + DLSGSourseIncome.tag + f"{self.id:03d}" + f"{i:03d}":
                 logging.fatal(f"Invalid ThirteenPercent subsection: {section_name}")
                 raise ValueError
-            self.sections[i] = DLSGSourseIncome(records)
+            self.sections[i] = DLSGSourseIncome(i, records)
 
-class DLSGDeclInquiry:
+    def write(self, records):
+        records.append(SECTION_PREFIX + self.tag + f"{self.id:03d}")
+        records.append(self.standard)
+        records.append(self.inn)
+        records.append(self.kpp)
+        records.append(self.oktmo)
+        records.append(self.name)
+        records.extend(self._records)
+        records.append(str(self.count))
+        for section in self.sections:
+            self.sections[section].write(records, self.id)
+
+class DLSGDeclInquiry(DLSGsection):
     tag = 'DeclInquiry'
 
     def __init__(self, records):
@@ -99,11 +167,17 @@ class DLSGDeclInquiry:
                 raise ValueError
             self.sections[i] = DLSGThirteenPercent(i, records)
 
-        self.records = []
-        while (len(records) > 0) and (records[0][:1] != SECTION_PREFIX):
-            self.records.append(records.pop(0))
+        super().__init__(self.tag, records)
 
-class DLSGCurrencyIncome:
+    def write(self, records):
+        self.write_tag(records)
+        records.append(str(self.count))
+
+        for section in self.sections:
+            self.sections[section].write(records)
+        records.extend(self._records)
+
+class DLSGCurrencyIncome(DLSGsection):
     tag = 'CurrencyIncome'
 
     # Create empty dividend
@@ -127,7 +201,7 @@ class DLSGCurrencyIncome:
         self.income_rub = 0.0
         self.tax_currency = 0.0
         self.tax_rub = 0.0
-        self.records = ['0', '0', '0', '0', '', '0']
+        self._records = ['0', '0', '0', '0', '', '0']
 
     # Created dividend based of records from file
     def __init__(self, id, records):
@@ -150,11 +224,34 @@ class DLSGCurrencyIncome:
         self.income_rub = float(records.pop(0))
         self.tax_currency = float(records.pop(0))
         self.tax_rub = float(records.pop(0))
-        self.records = records[:6]
-        [records.pop(0) for _ in range(6)]
+        super().__init__(self.tag, records)
+        # self.records = records[:6]
+        # [records.pop(0) for _ in range(6)]
+
+    def write(self, records):
+        records.append(SECTION_PREFIX + self.tag + f"{self.id:03d}")
+        records.append(self.type)
+        records.append(self.income_code)
+        records.append(self.income_description)
+        records.append(self.description)
+        records.append(self.country_code)
+        records.append(self.income_date)
+        records.append(self.tax_payment_date)
+        records.append(self.auto_currency_rate)
+        records.append(self.currency_code)
+        records.append(self.income_rate)
+        records.append(self.income_units)
+        records.append(self.tax_rate)
+        records.append(self.tax_units)
+        records.append(self.currency_name)
+        records.append(self.income_currency)
+        records.append(self.income_rub)
+        records.append(self.tax_currency)
+        records.append(self.tax_rub)
+        super().write(records)
 
 
-class DLSGDeclForeign:
+class DLSGDeclForeign(DLSGsection):
     tag = 'DeclForeign'
     currencies = {
         "USD": ('840', 'Доллар сша', 100)
@@ -171,6 +268,8 @@ class DLSGDeclForeign:
                 logging.fatal(f"Invalid DeclForeign subsection: {section_name}")
                 raise ValueError
             self.sections[i] = DLSGCurrencyIncome(i, records)
+
+        super().__init__(self.tag, records)
 
     def add_dividend(self, description, timestamp, currency_code, amount, amount_rub, tax, tax_rub, rate):
         currency = self.currencies[currency_code]
@@ -189,13 +288,12 @@ class DLSGDeclForeign:
         self.sections[self.count] = dividend
         self.count += 1
 
+    def write(self, records):
+        self.write_tag(records)
+        records.append(str(self.count))
+        for section in self.sections:
+            self.sections[section].write(records)
 
-class DLSGUnknownSection:
-    def __init__(self, tag, records):
-        self.tag = tag
-        self.records = []
-        while (len(records) > 0) and (records[0][:1] != SECTION_PREFIX):
-            self.records.append(records.pop(0))
 
 class DLSG:
     header_pattern = "DLSG            Decl(\d{4})0102FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -283,7 +381,7 @@ class DLSG:
             elif section_name == DLSGDeclForeign.tag:
                 section = DLSGDeclForeign(self._records)
             else:
-                section = DLSGUnknownSection(section_name, self._records)
+                section = DLSGsection(section_name, self._records)
 
             self._sections[i] = section
             i += 1
@@ -291,3 +389,19 @@ class DLSG:
         logging.debug(f"Sections loaded: {i}")
         for j in range(i):
             logging.debug(f"Section: {self._sections[j].tag}")
+
+    def write_record(self, file, record):
+        pass
+
+    def write_file(self, filename):
+        logging.info(f"Writing file: {filename}")
+
+        self._records = []
+
+        for section in self._sections:
+            self._sections[section].write(self._records)
+        logging.debug(f"Declaration to write: {self._records}")
+
+        with open(filename, "w", encoding='cp1251') as taxes:
+            for record in self._records:
+                self.write_record(taxes, record)

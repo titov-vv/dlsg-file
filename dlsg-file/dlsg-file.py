@@ -11,7 +11,8 @@ def get_cmd_line_agurments():
         usage="%(prog)s [OPTION] [FILE]...",
         description="DLSG file parser"
     )
-    parser.add_argument('--file', metavar="FILE .dcX", help="Name of file to parse")
+    parser.add_argument('--file', required=True, metavar="FILE .dcX", help="Name of file to parse")
+    parser.add_argument('--output', required=True, metavar="FILE .dcX", help="Name of file to write")
     return parser.parse_args()
 
 def main():
@@ -21,6 +22,8 @@ def main():
     args = get_cmd_line_agurments()
     statement = DLSG()
     statement.read_file(args.file)
+
+    statement.write_file(args.output)
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
