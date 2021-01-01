@@ -102,9 +102,7 @@ class DLSGSourseIncome(DLSGsection):
         self.deduction_amount = records.pop(0)
         self.unknown = records.pop(0)
         self.month = records.pop(0)
-        # self.records = records[:4]
         super().__init__(self.tag, records)
-        # [records.pop(0) for _ in range(4)]
 
     def write(self, records, id):
         records.append(SECTION_PREFIX + self.tag + f"{id:03d}" + f"{self.id:03d}")
@@ -225,8 +223,6 @@ class DLSGCurrencyIncome(DLSGsection):
         self.tax_currency = float(records.pop(0))
         self.tax_rub = float(records.pop(0))
         super().__init__(self.tag, records)
-        # self.records = records[:6]
-        # [records.pop(0) for _ in range(6)]
 
     def write(self, records):
         records.append(SECTION_PREFIX + self.tag + f"{self.id:03d}")
@@ -287,6 +283,40 @@ class DLSGDeclForeign(DLSGsection):
         dividend.tax_rub = tax_rub
         self.sections[self.count] = dividend
         self.count += 1
+
+    def write(self, records):
+        self.write_tag(records)
+        records.append(str(self.count))
+        for section in self.sections:
+            self.sections[section].write(records)
+
+
+class DLSGReturn(DLSGsection):
+    tag = 'Return'
+
+    def __init__(self, id, records):
+        self.id = id
+        super().__init__(self.tag, records)
+
+    def write(self, records):
+        records.append(SECTION_PREFIX + self.tag + f"{self.id:03d}")
+        records.extend(self._records)
+
+
+class DLSGWhereReturn(DLSGsection):
+    tag = 'DeclWhereReturn'
+
+    def __init__(self, records):
+        self.count = int(records.pop(0))
+        self.sections = {}
+
+        for i in range(self.count):
+            section_name = records.pop(0)
+
+            if section_name != SECTION_PREFIX + DLSGReturn.tag + f"{i:03d}":
+                logging.fatal(f"Invalid WhereReturn subsection: {section_name}")
+                raise ValueError
+            self.sections[i] = DLSGReturn(i, records)
 
     def write(self, records):
         self.write_tag(records)
@@ -382,6 +412,8 @@ class DLSG:
                 section = DLSGDeclInquiry(self._records)
             elif section_name == DLSGDeclForeign.tag:
                 section = DLSGDeclForeign(self._records)
+            elif section_name == DLSGWhereReturn.tag:
+                section = DLSGWhereReturn(self._records)
             else:
                 section = DLSGsection(section_name, self._records)
 
@@ -390,7 +422,7 @@ class DLSG:
 
         logging.debug(f"Sections loaded: {i}")
         for j in range(i):
-            logging.debug(f"Section: {self._sections[j].tag}")
+            logging.debug(f"Section: {self._sections[j].tag} ")
 
     def write_file(self, filename):
         logging.info(f"Writing file: {filename}")
