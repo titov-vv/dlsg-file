@@ -178,51 +178,49 @@ class DLSGDeclInquiry(DLSGsection):
 class DLSGCurrencyIncome(DLSGsection):
     tag = 'CurrencyIncome'
 
-    # Create empty dividend
-    def __init__(self, id):
-        self.id = id
-        self.type = '14'
-        self.income_code = '1010'
-        self.income_description = 'Дивиденды'
-        self.description = ''
-        self.country_code = '840'
-        self.income_date = 0
-        self.tax_payment_date = 0
-        self.auto_currency_rate = '0'   # '0' = no auto currency rates
-        self.currency_code = ''
-        self.income_rate = 0.0
-        self.income_units = 0
-        self.tax_rate = 0.0
-        self.tax_units = 0
-        self.currency_name = ''
-        self.income_currency = 0.0
-        self.income_rub = 0.0
-        self.tax_currency = 0.0
-        self.tax_rub = 0.0
-        self._records = ['0', '0', '0', '0', '', '0']
-
-    # Created dividend based of records from file
-    def __init__(self, id, records):
-        self.id = id
-        self.type = records.pop(0)
-        self.income_code = records.pop(0)
-        self.income_description = records.pop(0)
-        self.description = records.pop(0)
-        self.country_code = records.pop(0)
-        self.income_date = int(records.pop(0))
-        self.tax_payment_date = int(records.pop(0))
-        self.auto_currency_rate = records.pop(0)   # '0' = no auto currency rates
-        self.currency_code = records.pop(0)
-        self.income_rate = float(records.pop(0))
-        self.income_units = int(records.pop(0))
-        self.tax_rate = float(records.pop(0))
-        self.tax_units = int(records.pop(0))
-        self.currency_name = records.pop(0)
-        self.income_currency = float(records.pop(0))
-        self.income_rub = float(records.pop(0))
-        self.tax_currency = float(records.pop(0))
-        self.tax_rub = float(records.pop(0))
-        super().__init__(self.tag, records)
+    def __init__(self, id, records = None):
+        if records is None:    # Create empty dividend
+            self.id = id
+            self.type = '14'
+            self.income_code = '1010'
+            self.income_description = 'Дивиденды'
+            self.description = ''
+            self.country_code = '840'
+            self.income_date = 0
+            self.tax_payment_date = 0
+            self.auto_currency_rate = '0'  # '0' = no auto currency rates
+            self.currency_code = ''
+            self.income_rate = 0.0
+            self.income_units = 0
+            self.tax_rate = 0.0
+            self.tax_units = 0
+            self.currency_name = ''
+            self.income_currency = 0.0
+            self.income_rub = 0.0
+            self.tax_currency = 0.0
+            self.tax_rub = 0.0
+            self._records = ['0', '0', '0', '0', '', '0']
+        else:
+            self.id = id
+            self.type = records.pop(0)
+            self.income_code = records.pop(0)
+            self.income_description = records.pop(0)
+            self.description = records.pop(0)
+            self.country_code = records.pop(0)
+            self.income_date = int(records.pop(0))
+            self.tax_payment_date = int(records.pop(0))
+            self.auto_currency_rate = records.pop(0)   # '0' = no auto currency rates
+            self.currency_code = records.pop(0)
+            self.income_rate = float(records.pop(0))
+            self.income_units = int(records.pop(0))
+            self.tax_rate = float(records.pop(0))
+            self.tax_units = int(records.pop(0))
+            self.currency_name = records.pop(0)
+            self.income_currency = float(records.pop(0))
+            self.income_rub = float(records.pop(0))
+            self.tax_currency = float(records.pop(0))
+            self.tax_rub = float(records.pop(0))
+            super().__init__(self.tag, records)
 
     def write(self, records):
         records.append(SECTION_PREFIX + self.tag + f"{self.id:03d}")
@@ -231,26 +229,26 @@ class DLSGCurrencyIncome(DLSGsection):
         records.append(self.income_description)
         records.append(self.description)
         records.append(self.country_code)
-        records.append(self.income_date)
-        records.append(self.tax_payment_date)
+        records.append(str(self.income_date))
+        records.append(str(self.tax_payment_date))
         records.append(self.auto_currency_rate)
         records.append(self.currency_code)
-        records.append(self.income_rate)
-        records.append(self.income_units)
-        records.append(self.tax_rate)
-        records.append(self.tax_units)
+        records.append(str(self.income_rate))
+        records.append(str(self.income_units))
+        records.append(str(self.tax_rate))
+        records.append(str(self.tax_units))
         records.append(self.currency_name)
-        records.append(self.income_currency)
-        records.append(self.income_rub)
-        records.append(self.tax_currency)
-        records.append(self.tax_rub)
-        super().write(records)
+        records.append(str(self.income_currency))
+        records.append(str(self.income_rub))
+        records.append(str(self.tax_currency))
+        records.append(str(self.tax_rub))
+        records.extend(self._records)
 
 
 class DLSGDeclForeign(DLSGsection):
     tag = 'DeclForeign'
     currencies = {
-        "USD": ('840', 'Доллар сша', 100)
+        "USD": ('840', 'Доллар США', 100)
     }
 
     def __init__(self, records):
@@ -271,7 +269,7 @@ class DLSGDeclForeign(DLSGsection):
         currency = self.currencies[currency_code]
         dividend = DLSGCurrencyIncome(self.count)
         dividend.description = description
-        dividend.income_date = (timestamp.date() - datetime.date(1899, 12, 30)).days
+        dividend.income_date = (timestamp - datetime.date(1899, 12, 30)).days
         dividend.tax_payment_date = dividend.income_date
         dividend.currency_code = currency[0]
         dividend.currency_name = currency[1]
@@ -346,8 +344,8 @@ class DLSG:
 
     def get_section(self, name):
         for section in self._sections:
-            if section.tag == name:
-                return section
+            if self._sections[section].tag == name:
+                return self._sections[section]
         return None
 
     # Method reads declaration form a file with given filename
