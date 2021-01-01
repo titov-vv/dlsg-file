@@ -297,6 +297,8 @@ class DLSGDeclForeign(DLSGsection):
 
 class DLSG:
     header_pattern = "DLSG            Decl(\d{4})0102FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+    header = "DLSG            Decl{:04d}0102FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+
     def __init__(self):
         self._year = 0              # year of declaration
         self._records = []
@@ -390,9 +392,6 @@ class DLSG:
         for j in range(i):
             logging.debug(f"Section: {self._sections[j].tag}")
 
-    def write_record(self, file, record):
-        pass
-
     def write_file(self, filename):
         logging.info(f"Writing file: {filename}")
 
@@ -402,6 +401,9 @@ class DLSG:
             self._sections[section].write(self._records)
         logging.debug(f"Declaration to write: {self._records}")
 
+        raw_data = self.header.format(self._year)
+        for record in self._records:
+            raw_data += "{:04d}{}".format(len(record), record)
+
         with open(filename, "w", encoding='cp1251') as taxes:
-            for record in self._records:
-                self.write_record(taxes, record)
+            taxes.write(raw_data)
